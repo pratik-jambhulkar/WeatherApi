@@ -1,5 +1,6 @@
 package com.example.pratik.weatherapi.ui;
 
+import android.location.Location;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.ActionBarActivity;
@@ -12,6 +13,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.example.pratik.weatherapi.R;
+import com.example.pratik.weatherapi.adapters.GPSTracker;
 import com.example.pratik.weatherapi.beans.Example;
 import com.example.pratik.weatherapi.interfaces.WeatherApiServiceInterface;
 
@@ -43,6 +45,9 @@ public class MainActivity extends ActionBarActivity {
     double latitude, longitude;
     String maxtempC, mintempC;
     TextView mintemp, maxtemp;
+    String query;
+
+    Location loc;
 
     String API = "http://api.worldweatheronline.com";
 
@@ -62,8 +67,29 @@ public class MainActivity extends ActionBarActivity {
 
         final WeatherApiServiceInterface weatherApiServiceInterface = restAdapter.create(WeatherApiServiceInterface.class);
 
-        
+        try {
+            gps = new GPSTracker(MainActivity.this);
 
+            if(gps.isNetworkEnabled()){
+                loc = gps.getLocationFromNetwork();
+                Toast.makeText(this,"From Network",Toast.LENGTH_SHORT).show();
+            } else if(gps.isGPSEnabled() && loc == null){
+                loc = gps.getLocationFromGPS();
+                Toast.makeText(this,"From GPS",Toast.LENGTH_SHORT).show();
+            } else {
+                gps.showSettingsAlert();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        if(loc != null) {
+            latitude = loc.getLatitude();
+            longitude = loc.getLongitude();
+            query = latitude + "," + longitude;
+            Toast.makeText(this, "Lat:" + latitude + "long:" + longitude, Toast.LENGTH_SHORT).show();
+            gps.stopUsingGPS();
+        }
         btnShowLocation = (Button) findViewById(R.id.btnShowLocation);
 
         // show location button click event
@@ -72,48 +98,27 @@ public class MainActivity extends ActionBarActivity {
             @Override
             public void onClick(View arg0) {
                 // create class object
-                gps = new GPSTracker(MainActivity.this);
+                //                    new SimpleAsyncTask().execute("http://api.worldweatheronline.com/free/v2/weather.ashx?key=0bf2cda0e05a26112e2aad3a46670&q=18.48,73.90&num_of_days=1&tp=24&format=json");
+                // \n is for new line
+                // check if GPS enabled
 
-                if (gps.canGetLocation()) {
-
-                    latitude = gps.getLatitude();
-                    longitude = gps.getLongitude();
-
-//                    new SimpleAsyncTask().execute("http://api.worldweatheronline.com/free/v2/weather.ashx?key=0bf2cda0e05a26112e2aad3a46670&q=18.48,73.90&num_of_days=1&tp=24&format=json");
-
-                    // \n is for new line
-
-                    // check if GPS enabled
-                    if (gps.canGetLocation()) {
-
-                        double latitude = gps.getLatitude();
-                        double longitude = gps.getLongitude();
-
-                        // \n is for new line
-                        Toast.makeText(getApplicationContext(), "Your Location is - \nLat: " + latitude + "\nLong: " + longitude, Toast.LENGTH_LONG).show();
-
-                    } else {
-                        // can't get location
-                        // GPS or Network is not enabled
-                        // Ask user to enable GPS/network in settings
-                        gps.showSettingsAlert();
+                weatherApiServiceInterface.getWeatherDetails(query,new Callback<Example>() {
+                    @Override
+                    public void success(Example example, Response response) {
+//                        Toast.makeText(MainActivity.this, example.getData().getWeather().get(0).getMaxtempC().toString(), Toast.LENGTH_SHORT).show();
+                        mintemp.setText(example.getData().getWeather().get(0).getMintempC());
+                        maxtemp.setText(example.getData().getWeather().get(0).getMaxtempC());
                     }
 
-                    weatherApiServiceInterface.getWeatherDetails(new Callback<Example>() {
-                        @Override
-                        public void success(Example example, Response response) {
-                            Toast.makeText(MainActivity.this, example.getData().getWeather().get(0).getMaxtempC().toString(), Toast.LENGTH_SHORT).show();
-                        }
+                    @Override
+                    public void failure(RetrofitError error) {
+                        Toast.makeText(MainActivity.this, "Failed", Toast.LENGTH_SHORT).show();
+                    }
+                });
+                // check if GPS enabled
 
-                        @Override
-                        public void failure(RetrofitError error) {
-                            Toast.makeText(MainActivity.this, "Failed", Toast.LENGTH_SHORT).show();
-                        }
-                    });
-                    // check if GPS enabled
-
-                }
             }
+
         });
 
 //        test
